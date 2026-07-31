@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SilentSpeak MVP Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 40px;
+            background-color: #121212;
+            color: #ffffff;
+        }
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            cursor: pointer;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        pre {
+            background-color: #1e1e1e;
+            padding: 15px;
+            border-radius: 5px;
+            border: 1px solid #333;
+        }
+    </style>
+</head>
+<body>
+
+    <h2>⚡ SilentSpeak WebSocket MVP Pipeline</h2>
+    <p>Status: <span id="status" style="color: yellow;">Connecting...</span></p>
+
+    <button onclick="sendMockLandmarks()">Send Mock Keypoints</button>
+
+    <h3>Backend Output:</h3>
+    <pre id="output">Waiting for user action...</pre>
+
+    <script>
+        // Connect to FastAPI WebSocket Endpoint
+        const ws = new WebSocket("ws://localhost:8000/ws/translate");
+
+        const statusEl = document.getElementById("status");
+        const outputEl = document.getElementById("output");
+
+        ws.onopen = () => {
+            statusEl.innerText = "Connected to Backend!";
+            statusEl.style.color = "lime";
+        };
+
+        ws.onclose = () => {
+            statusEl.innerText = "Disconnected";
+            statusEl.style.color = "red";
+        };
+
+        ws.onerror = (error) => {
+            console.error("WebSocket Error:", error);
+            statusEl.innerText = "Connection Error";
+            statusEl.style.color = "red";
+        };
+
+        // Listen for messages from Backend
+        ws.onmessage = (event) => {
+            const response = JSON.parse(event.data);
+            outputEl.innerText = JSON.stringify(response, null, 2);
+        };
+
+        // Simulate sending 21 MediaPipe hand landmarks (X, Y, Z coordinates)
+        function sendMockLandmarks() {
+            if (ws.readyState !== WebSocket.OPEN) {
+                alert("WebSocket is not connected yet!");
+                return;
+            }
+
+            const mockLandmarks = Array.from({ length: 21 }, () => [
+                parseFloat(Math.random().toFixed(2)),
+                parseFloat(Math.random().toFixed(2)),
+                parseFloat(Math.random().toFixed(2))
+            ]);
+
+            const payload = { landmarks: mockLandmarks };
+            ws.send(JSON.stringify(payload));
+        }
+    </script>
+</body>
+</html>
