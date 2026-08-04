@@ -2,6 +2,7 @@ import asyncio
 import random
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from app.connection import manager
+from app.services.tts_service import generate_audio_base64
 
 app = FastAPI(title="SilentSpeak Backend MVP")
 
@@ -26,11 +27,16 @@ async def websocket_translate(websocket: WebSocket):
 
             # 2. Simulate processing latency (~50ms)
             await asyncio.sleep(0.05)
+            
+            predicted_text = random.choice(MOCK_WORDS)
+            
+            audio_base64 = await generate_audio_base64(predicted_text)
 
             # 3. Generate mock payload response
             response_payload = {
-                "text": random.choice(MOCK_WORDS),
+                "text": predicted_text,
                 "confidence": round(random.uniform(0.85, 0.99), 2),
+                "audio": audio_base64,
                 "status": "success",
             }
 
