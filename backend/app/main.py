@@ -1,5 +1,4 @@
 import asyncio
-import random
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from app.connection import manager
 from app.services.tts_service import generate_audio_base64
