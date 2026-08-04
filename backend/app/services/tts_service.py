@@ -23,7 +23,9 @@ async def generate_audio_base64(text: str, voice: str = DEFAULT_VOICE) -> str | 
     # 3. Stream audio chunk by chunk from edge-tts into our buffer
     async for chunk in communicate.stream():
         if chunk["type"] == "audio":
-            audio_buffer.write(chunk["data"])
+            data = chunk.get("data")
+            if data is not None:
+                audio_buffer.write(data)
 
     # 4. Get all raw audio bytes from the buffer
     raw_audio_bytes = audio_buffer.getvalue()
