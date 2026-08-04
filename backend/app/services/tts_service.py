@@ -2,8 +2,8 @@ import base64
 import io
 import edge_tts
 
-# Define a default neural voice (e.g., en-US-AriaNeural)
-DEFAULT_VOICE = "mr-IN-AarohiNeural"
+# Switched to a standard fast neural voice (or keep your preferred voice)
+DEFAULT_VOICE = "en-US-AvaNeural"
 
 
 async def generate_audio_base64(text: str, voice: str = DEFAULT_VOICE) -> str | None:
@@ -14,8 +14,8 @@ async def generate_audio_base64(text: str, voice: str = DEFAULT_VOICE) -> str | 
     if not text.strip():
         return None
 
-    # 1. Initialize the edge-tts communicator
-    communicate = edge_tts.Communicate(text, voice)
+    # 1. Initialize edge-tts with rate="+15%" to speed up synthesis & delivery
+    communicate = edge_tts.Communicate(text, voice, rate="+15%")
 
     # 2. Create an in-memory byte buffer (RAM storage)
     audio_buffer = io.BytesIO()
