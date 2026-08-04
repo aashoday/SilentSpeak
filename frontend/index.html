@@ -3,54 +3,88 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SilentSpeak MVP Test</title>
+    <title>SilentSpeak Live Webcam Test</title>
+
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+
     <style>
         body {
             font-family: Arial, sans-serif;
-            margin: 40px;
+            margin: 30px;
             background-color: #121212;
             color: #ffffff;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
         }
-        button {
-            padding: 10px 20px;
-            font-size: 16px;
-            cursor: pointer;
-            background-color: #4CAF50;
-            color: white;
-            border: none;
-            border-radius: 5px;
+
+        .container {
+            position: relative;
+            width: 640px;
+            height: 480px;
         }
-        button:hover {
-            background-color: #45a049;
+
+        /* The canvas sits directly on top of the hidden video preview */
+        canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            border: 2px solid #333;
+            border-radius: 8px;
+            background-color: #000;
+            transform: scaleX(-1);
         }
+
+        /* Keep raw video tag hidden or overlaid behind canvas */
+        video {
+            display: none;
+        }
+
         .result-card {
             background-color: #1e1e1e;
-            padding: 15px;
-            border-radius: 5px;
+            padding: 15px 25px;
+            border-radius: 8px;
             border: 1px solid #333;
             margin-top: 15px;
-            font-size: 18px;
+            width: 590px;
+            text-align: center;
         }
     </style>
 </head>
 <body>
 
-    <h2>⚡ SilentSpeak WebSocket MVP Pipeline</h2>
-    <p>Status: <span id="status" style="color: yellow;">Connecting...</span></p>
+    <h2>⚡ SilentSpeak Live Webcam Pipeline</h2>
+    <p>Status: <span id="status" style="color: yellow;">Connecting to Backend...</span></p>
 
-    <button onclick="sendMockLandmarks()">Send Mock Keypoints</button>
+    <div class="container">
+        <video id="webcam" playsinline></video>
+        <canvas id="output_canvas" width="650" height="500"></canvas>
+    </div>
 
-    <h3>Backend Output:</h3>
-    <div id="output" class="result-card">Waiting for user action...</div>
+    <div id="output" class="result-card">
+        <p><strong>Predicted Word:</strong> <span id="predicted-word">Waiting for hand...</span></p>
+        <p><strong>Confidence:</strong> <span id="confidence-score">0.0%</span></p>
+    </div>
 
     <script>
+        // DOM Elements
+        const statusEl = document.getElementById("status");
+        const wordEl = document.getElementById("predicted-word");
+        const confidenceEl = document.getElementById("confidence-score");
+        const videoElement = document.getElementById("webcam");
+        const canvasElement = document.getElementById("output_canvas");
+        const canvasCtx = canvasElement.getContext("2d");
+
+        // Variable to track the last spoken word to prevent repeating audio continuously
+        let lastSpokenWord = "";
+
+        // 1. Establish WebSocket connection to FastAPI
         const ws = new WebSocket("ws://localhost:8000/ws/translate");
 
-        const statusEl = document.getElementById("status");
-        const outputEl = document.getElementById("output");
-
         ws.onopen = () => {
-            statusEl.innerText = "Connected to Backend!";
+            statusEl.innerText = "Connected & Active!";
             statusEl.style.color = "lime";
         };
 
@@ -65,18 +99,18 @@
             statusEl.style.color = "red";
         };
 
-        // Listen for messages from Backend
+        // Handle incoming prediction JSON from FastAPI backend
         ws.onmessage = (event) => {
             const response = JSON.parse(event.data);
 
-            // 1. Render clean human-readable text on screen (Hides the raw Base64 audio string!)
-            outputEl.innerHTML = `
-                <p><strong>Predicted Word:</strong> ${response.text}</p>
-                <p><strong>Confidence:</strong> ${(response.confidence * 100).toFixed(1)}%</p>
-            `;
+            // Update screen text immediately
+            wordEl.innerText = response.text;
+            confidenceEl.innerText = `${(response.confidence * 100).toFixed(1)}%`;
 
-            // 2. Play the audio in the background
-            if (response.audio) {
+            // Play audio ONLY when a new distinct word is detected
+            if (response.audio && response.text !== lastSpokenWord && response.text !== "No Hand Detected" && response.text !== "Unknown Gesture") {
+                lastSpokenWord = response.text; // Update last spoken word tracker
+
                 const audioSource = "data:audio/mp3;base64," + response.audio;
                 const audio = new Audio(audioSource);
                 
@@ -86,21 +120,55 @@
             }
         };
 
-        function sendMockLandmarks() {
-            if (ws.readyState !== WebSocket.OPEN) {
-                alert("WebSocket is not connected yet!");
-                return;
+        // 2. Configure MediaPipe Hands Engine
+        const hands = new Hands({
+            locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
+        });
+
+        hands.setOptions({
+            maxNumHands: 1,            // Track 1 hand for simplicity
+            modelComplexity: 1,        // Balanced accuracy & performance
+            minDetectionConfidence: 0.5,
+            minTrackingConfidence: 0.5
+        });
+
+        // 3. Callback function executed whenever MediaPipe processes a video frame
+        hands.onResults((results) => {
+            // Draw current camera frame onto the canvas
+            canvasCtx.save();
+            canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
+            canvasCtx.drawImage(results.image, 0, 0, canvasElement.width, canvasElement.height);
+
+            // If a hand is visible in the frame
+            if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
+                const landmarks = results.multiHandLandmarks[0];
+
+                // A. Draw skeleton connectors and landmark dots on canvas
+                drawConnectors(canvasCtx, landmarks, HAND_CONNECTIONS, { color: '#00FF00', lineWidth: 3 });
+                drawLandmarks(canvasCtx, landmarks, { color: '#FF0000', lineWidth: 1, radius: 4 });
+
+                // B. Transmit keypoint coordinate array over WebSocket if open
+                if (ws.readyState === WebSocket.OPEN) {
+                    ws.send(JSON.stringify({ landmarks: landmarks }));
+                }
+            } else {
+                // Reset last spoken word when hand leaves screen so signing it again repeats audio
+                lastSpokenWord = "";
             }
 
-            const mockLandmarks = Array.from({ length: 21 }, () => [
-                parseFloat(Math.random().toFixed(2)),
-                parseFloat(Math.random().toFixed(2)),
-                parseFloat(Math.random().toFixed(2))
-            ]);
+            canvasCtx.restore();
+        });
 
-            const payload = { landmarks: mockLandmarks };
-            ws.send(JSON.stringify(payload));
-        }
+        // 4. Start Camera Request Loop using MediaPipe Camera Helper
+        const camera = new Camera(videoElement, {
+            onFrame: async () => {
+                await hands.send({ image: videoElement });
+            },
+            width: 640,
+            height: 480
+        });
+
+        camera.start();
     </script>
 </body>
 </html>
