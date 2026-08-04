@@ -23,11 +23,13 @@
         button:hover {
             background-color: #45a049;
         }
-        pre {
+        .result-card {
             background-color: #1e1e1e;
             padding: 15px;
             border-radius: 5px;
             border: 1px solid #333;
+            margin-top: 15px;
+            font-size: 18px;
         }
     </style>
 </head>
@@ -39,10 +41,9 @@
     <button onclick="sendMockLandmarks()">Send Mock Keypoints</button>
 
     <h3>Backend Output:</h3>
-    <pre id="output">Waiting for user action...</pre>
+    <div id="output" class="result-card">Waiting for user action...</div>
 
     <script>
-        // Connect to FastAPI WebSocket Endpoint
         const ws = new WebSocket("ws://localhost:8000/ws/translate");
 
         const statusEl = document.getElementById("status");
@@ -67,10 +68,24 @@
         // Listen for messages from Backend
         ws.onmessage = (event) => {
             const response = JSON.parse(event.data);
-            outputEl.innerText = JSON.stringify(response, null, 2);
+
+            // 1. Render clean human-readable text on screen (Hides the raw Base64 audio string!)
+            outputEl.innerHTML = `
+                <p><strong>Predicted Word:</strong> ${response.text}</p>
+                <p><strong>Confidence:</strong> ${(response.confidence * 100).toFixed(1)}%</p>
+            `;
+
+            // 2. Play the audio in the background
+            if (response.audio) {
+                const audioSource = "data:audio/mp3;base64," + response.audio;
+                const audio = new Audio(audioSource);
+                
+                audio.play().catch((error) => {
+                    console.error("Audio playback error:", error);
+                });
+            }
         };
 
-        // Simulate sending 21 MediaPipe hand landmarks (X, Y, Z coordinates)
         function sendMockLandmarks() {
             if (ws.readyState !== WebSocket.OPEN) {
                 alert("WebSocket is not connected yet!");
