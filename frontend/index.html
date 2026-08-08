@@ -1,174 +1,168 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SilentSpeak Live Webcam Test</title>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>SilentSpeak — Sign Language to Speech, Live</title>
+<meta name="description" content="Real-time sign language to speech translation using just a webcam." />
 
-    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Anton&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css" />
 
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            margin: 30px;
-            background-color: #121212;
-            color: #ffffff;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-        }
-
-        .container {
-            position: relative;
-            width: 640px;
-            height: 480px;
-        }
-
-        /* The canvas sits directly on top of the hidden video preview */
-        canvas {
-            position: absolute;
-            top: 0;
-            left: 0;
-            border: 2px solid #333;
-            border-radius: 8px;
-            background-color: #000;
-            transform: scaleX(-1);
-        }
-
-        /* Keep raw video tag hidden or overlaid behind canvas */
-        video {
-            display: none;
-        }
-
-        .result-card {
-            background-color: #1e1e1e;
-            padding: 15px 25px;
-            border-radius: 8px;
-            border: 1px solid #333;
-            margin-top: 15px;
-            width: 590px;
-            text-align: center;
-        }
-    </style>
+<!-- MediaPipe -->
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
 </head>
 <body>
 
-    <h2>⚡ SilentSpeak Live Webcam Pipeline</h2>
-    <p>Status: <span id="status" style="color: yellow;">Connecting to Backend...</span></p>
-
-    <div class="container">
-        <video id="webcam" playsinline></video>
-        <canvas id="output_canvas" width="650" height="500"></canvas>
+<header class="site-header">
+  <div class="wrap nav">
+    <a href="#top" class="logo"><span class="logo-mark">S</span>SilentSpeak<span>.</span></a>
+    <nav>
+      <ul class="nav-links">
+        <li><a href="#pipeline">Live demo</a></li>
+        <li><a href="#how-it-works">How it works</a></li>
+      </ul>
+    </nav>
+    <div class="nav-actions">
+      <a href="#pipeline" class="btn btn-primary">Try it live</a>
+      <button class="nav-toggle" aria-label="Toggle menu" aria-expanded="false">☰</button>
     </div>
+  </div>
+</header>
 
-    <div id="output" class="result-card">
-        <p><strong>Predicted Word:</strong> <span id="predicted-word">Waiting for hand...</span></p>
-        <p><strong>Confidence:</strong> <span id="confidence-score">0.0%</span></p>
+<main id="top">
+  <!-- HERO -->
+  <section class="hero">
+    <div class="wrap hero-inner">
+      <p class="eyebrow">Real-time · webcam only · no wearables</p>
+      <h1>Sign language,<br>spoken <span class="accent">instantly.</span></h1>
+      <p>
+        SilentSpeak watches your hand through any webcam, recognizes the sign
+        with MediaPipe, and speaks it out loud in real time — no gloves,
+        no sensors, no app install.
+      </p>
+      <div class="hero-cta">
+        <a href="#pipeline" class="btn btn-primary">Start signing</a>
+        <a href="#how-it-works" class="btn btn-ghost">How it works</a>
+      </div>
     </div>
+  </section>
 
-    <script>
-        // DOM Elements
-        const statusEl = document.getElementById("status");
-        const wordEl = document.getElementById("predicted-word");
-        const confidenceEl = document.getElementById("confidence-score");
-        const videoElement = document.getElementById("webcam");
-        const canvasElement = document.getElementById("output_canvas");
-        const canvasCtx = canvasElement.getContext("2d");
+  <!-- LIVE PIPELINE -->
+  <section class="pipeline-section" id="pipeline">
+    <div class="wrap">
+      <div class="status-bar">
+        <span class="status-dot" id="status-dot"></span>
+        <span class="status-text">Status: <strong id="status">Connecting to backend…</strong></span>
+      </div>
 
-        // Variable to track the last spoken word to prevent repeating audio continuously
-        let lastSpokenWord = "";
+      <div class="pipeline-grid">
+        <!-- Camera -->
+        <div class="camera-panel">
+          <div class="camera-frame">
+            <span class="frame-badge"><span class="rec-dot"></span> Live feed</span>
+            <video id="webcam" playsinline></video>
+            <canvas id="output_canvas" width="650" height="500"></canvas>
+          </div>
+        </div>
 
-        // 1. Establish WebSocket connection to FastAPI
-        const ws = new WebSocket("ws://localhost:8000/ws/translate");
+        <!-- Result -->
+        <div class="result-panel">
+          <div class="result-card">
+            <h3>Predicted sign</h3>
+            <p class="predicted-word" id="predicted-word">Waiting for hand…</p>
+            <div class="confidence-row">
+              <span>Confidence</span>
+              <span id="confidence-score">0.0%</span>
+            </div>
+            <div class="confidence-track">
+              <div class="confidence-fill" id="confidence-fill"></div>
+            </div>
+          </div>
 
-        ws.onopen = () => {
-            statusEl.innerText = "Connected & Active!";
-            statusEl.style.color = "lime";
-        };
+          <div class="info-card">
+            <h4>Tips for best results</h4>
+            <ul>
+              <li>Keep one hand fully inside the frame</li>
+              <li>Sign against a plain, well-lit background</li>
+              <li>Hold each sign briefly so audio can trigger</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
 
-        ws.onclose = () => {
-            statusEl.innerText = "Disconnected";
-            statusEl.style.color = "red";
-        };
+  <!-- HOW IT WORKS -->
+  <section class="section section-alt" id="how-it-works">
+    <div class="wrap">
+      <div class="section-head">
+        <h2 class="section-title">How <span class="accent">SilentSpeak</span> works</h2>
+        <p class="section-desc">Three steps, all running in under a second, entirely from your browser's camera feed.</p>
+      </div>
+      <div class="steps-grid">
+        <div class="step-card">
+          <span class="step-num">01</span>
+          <h3>Track</h3>
+          <p>MediaPipe Hands extracts 21 landmark points from your hand, live, directly in the browser.</p>
+        </div>
+        <div class="step-card">
+          <span class="step-num">02</span>
+          <h3>Translate</h3>
+          <p>Landmarks stream over WebSocket to a FastAPI backend, which matches the gesture to a word.</p>
+        </div>
+        <div class="step-card">
+          <span class="step-num">03</span>
+          <h3>Speak</h3>
+          <p>The matched word is synthesized to natural speech and played back instantly in your browser.</p>
+        </div>
+      </div>
+    </div>
+  </section>
 
-        ws.onerror = (error) => {
-            console.error("WebSocket Error:", error);
-            statusEl.innerText = "Connection Error";
-            statusEl.style.color = "red";
-        };
+  <!-- CTA -->
+  <section class="section">
+    <div class="wrap">
+      <div class="cta-banner">
+        <h2>Try SilentSpeak with your own hands</h2>
+        <a href="#pipeline" class="btn btn-primary">Jump to live demo</a>
+      </div>
+    </div>
+  </section>
+</main>
 
-        // Handle incoming prediction JSON from FastAPI backend
-        ws.onmessage = (event) => {
-            const response = JSON.parse(event.data);
+<footer class="site-footer">
+  <div class="wrap">
+    <div class="footer-top">
+      <div class="footer-brand">
+        <a href="#top" class="logo"><span class="logo-mark">S</span>SilentSpeak<span>.</span></a>
+        <p>A real-time sign language to speech translator built with MediaPipe, FastAPI, and WebSockets.</p>
+      </div>
+      <div class="footer-meta">
+        <div>
+          <h4>Stack</h4>
+          <p>MediaPipe · FastAPI · WebSockets · edge-tts</p>
+        </div>
+        <div>
+          <h4>Status</h4>
+          <p id="footer-status">Checking connection…</p>
+        </div>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <span>© <span id="year"></span> SilentSpeak</span>
+      <span>Built for the Road Safety / AI Hackathon</span>
+    </div>
+  </div>
+</footer>
 
-            // Update screen text immediately
-            wordEl.innerText = response.text;
-            confidenceEl.innerText = `${(response.confidence * 100).toFixed(1)}%`;
-
-            // Play audio ONLY when a new distinct word is detected
-            if (response.audio && response.text !== lastSpokenWord && response.text !== "No Hand Detected" && response.text !== "Unknown Gesture") {
-                lastSpokenWord = response.text; // Update last spoken word tracker
-
-                const audioSource = "data:audio/mp3;base64," + response.audio;
-                const audio = new Audio(audioSource);
-                
-                audio.play().catch((error) => {
-                    console.error("Audio playback error:", error);
-                });
-            }
-        };
-
-        // 2. Configure MediaPipe Hands Engine
-        const hands = new Hands({
-            locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
-        });
-
-        hands.setOptions({
-            maxNumHands: 1,            // Track 1 hand for simplicity
-            modelComplexity: 1,        // Balanced accuracy & performance
-            minDetectionConfidence: 0.5,
-            minTrackingConfidence: 0.5
-        });
-
-        // 3. Callback function executed whenever MediaPipe processes a video frame
-        hands.onResults((results) => {
-            // Draw current camera frame onto the canvas
-            canvasCtx.save();
-            canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
-            canvasCtx.drawImage(results.image, 0, 0, canvasElement.width, canvasElement.height);
-
-            // If a hand is visible in the frame
-            if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
-                const landmarks = results.multiHandLandmarks[0];
-
-                // A. Draw skeleton connectors and landmark dots on canvas
-                drawConnectors(canvasCtx, landmarks, HAND_CONNECTIONS, { color: '#00FF00', lineWidth: 3 });
-                drawLandmarks(canvasCtx, landmarks, { color: '#FF0000', lineWidth: 1, radius: 4 });
-
-                // B. Transmit keypoint coordinate array over WebSocket if open
-                if (ws.readyState === WebSocket.OPEN) {
-                    ws.send(JSON.stringify({ landmarks: landmarks }));
-                }
-            } else {
-                // Reset last spoken word when hand leaves screen so signing it again repeats audio
-                lastSpokenWord = "";
-            }
-
-            canvasCtx.restore();
-        });
-
-        // 4. Start Camera Request Loop using MediaPipe Camera Helper
-        const camera = new Camera(videoElement, {
-            onFrame: async () => {
-                await hands.send({ image: videoElement });
-            },
-            width: 640,
-            height: 480
-        });
-
-        camera.start();
-    </script>
+<!-- websocket.js must load before webcam.js: webcam.js calls sendLandmarks() -->
+<script src="src/websocket.js"></script>
+<script src="src/webcam.js"></script>
+<script src="script.js"></script>
 </body>
 </html>
