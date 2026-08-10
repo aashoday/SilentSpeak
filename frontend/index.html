@@ -15,6 +15,49 @@
 <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
 <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
 <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 30px;
+            background-color: #121212;
+            color: #ffffff;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .container {
+            position: relative;
+            width: 640px;
+            height: 480px;
+        }
+
+        /* The canvas sits directly on top of the hidden video preview */
+        canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            border: 2px solid #333;
+            border-radius: 8px;
+            background-color: #000;
+            /* transform: scaleX(-1); */
+        }
+
+        /* Keep raw video tag hidden or overlaid behind canvas */
+        video {
+            display: none;
+        }
+
+        .result-card {
+            background-color: #1e1e1e;
+            padding: 15px 25px;
+            border-radius: 8px;
+            border: 1px solid #333;
+            margin-top: 15px;
+            width: 590px;
+            text-align: center;
+        }
+    </style>
 </head>
 <body>
 
